@@ -1,32 +1,24 @@
-using System.Collections;
-using System.Runtime.CompilerServices;
 using TMPro;
 using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public class TopDownPlayerController : MonoBehaviour
 {
     [Header("Movement Settings")]
-    [SerializeField] public float moveSpeed = 5f;
-    [SerializeField] public float acceleration = 15f;
-    [SerializeField] public float deceleration = 50f;
+    [SerializeField] private float moveSpeed = 5f;
+    [SerializeField] private float acceleration = 15f;
+    [SerializeField] private float deceleration = 50f;
     
-    [SerializeField] public GameObject textUI;
-
-    [Header("Anim")]
-
-    [SerializeField] public Vector3 tableCoord = new(3.03f, 0.53f, -0.1f);
-
-    private bool nearTable = false;
-
+    [SerializeField] private GameObject textUI;
+    
+    
+    // Private variables
     private Vector2 moveInput;
     private Vector2 currentVelocity;
     private Rigidbody2D rb;
 
     private TextMeshProUGUI pressE;
 
-    private PlayerInput playerInput;
     
     public void Start()
     {
@@ -35,9 +27,11 @@ public class TopDownPlayerController : MonoBehaviour
         
         pressE = textUI.GetComponent<TextMeshProUGUI>();
 
-        playerInput = FindFirstObjectByType<PlayerInput>();
-        
+    }
 
+    public void Update()
+    {
+        HandleInput();
     }
 
     public void FixedUpdate()
@@ -45,19 +39,14 @@ public class TopDownPlayerController : MonoBehaviour
         HandleMovement();
     }
 
-    public void OnMove(InputAction.CallbackContext ctx)
+    void HandleInput()
     {
-        moveInput = ctx.ReadValue<Vector2>();
+        var inputActions = FindFirstObjectByType<UnityEngine.InputSystem.PlayerInput>();
+        var moveAction = inputActions.actions["Move"];
+        moveInput = moveAction.ReadValue<Vector2>();
 
     }
     
-    public void OnInteract(InputAction.CallbackContext _){
-        if (nearTable){
-            playerInput.enabled = false;
-            StartCoroutine(Move(gameObject.transform.position, tableCoord, 1));
-        }
-    }
-
     void HandleMovement()
     {
         Vector2 targetVelocity = moveInput * moveSpeed;
@@ -65,22 +54,54 @@ public class TopDownPlayerController : MonoBehaviour
         // Smooth acceleration/deceleration
         if (moveInput.magnitude > 0)
         {
-            currentVelocity = Vector2.MoveTowards(currentVelocity, targetVelocity, acceleration);
+            currentVelocity = Vector2.MoveTowards(currentVelocity, targetVelocity, acceleration * Time.fixedDeltaTime);
         }
         else
         {
-            currentVelocity = Vector2.MoveTowards(currentVelocity, Vector2.zero, deceleration);
+            currentVelocity = Vector2.MoveTowards(currentVelocity, Vector2.zero, deceleration * Time.fixedDeltaTime);
         }
         
         // Apply movement
         rb.linearVelocity = currentVelocity;
     }
     
+    // Public methods for external access
+    public void SetMoveSpeed(float speed)
+    {
+        moveSpeed = Mathf.Max(0, speed);
+    }
+    
+    
+    public Vector2 GetCurrentVelocity()
+    {
+        return currentVelocity;
+    }
+    
+    public bool IsMoving()
+    {
+        return currentVelocity.magnitude > 0.1f;
+    }
+    
+    public Vector2 GetMoveInput()
+    {
+        return moveInput;
+    }
+    
+    // For animation controllers
+    public float GetMoveSpeed()
+    {
+        return currentVelocity.magnitude;
+    }
+    
+    public Vector2 GetMoveDirection()
+    {
+        return currentVelocity.normalized;
+    }
+    
     public void OnTriggerEnter2D(Collider2D collider)
     {
         if (collider.gameObject.tag == "SleepTable")
         {
-            nearTable = true;
             pressE.SetText("Press E");
         }
     }
@@ -89,17 +110,7 @@ public class TopDownPlayerController : MonoBehaviour
     {
         if (collider.gameObject.tag == "SleepTable")
         {
-            nearTable = false;
             pressE.SetText("");
         }
     }
-
-    IEnumerator Move(Vector3 beginPos, Vector3 endPos, float time){
-    for(float t = 0; t < 1; t += Time.deltaTime / time){
-        moveInput = new Vector2(0,0);
-        transform.position = Vector3.Lerp(beginPos, endPos, t);
-        yield return null;
-    }
-}
-
 }
